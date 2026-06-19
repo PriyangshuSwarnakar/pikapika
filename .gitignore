@@ -1,0 +1,7 @@
+build/
+dist/
+installer_output/
+*.exe
+*.spec
+__pycache__/
+*.py[cod]

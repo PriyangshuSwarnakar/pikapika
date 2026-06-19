@@ -1,0 +1,137 @@
+PIKAPIKA — BUILD & PACKAGE INSTRUCTIONS
+========================================
+Two stages: (1) PyInstaller turns the .py into a standalone .exe folder,
+(2) Inno Setup wraps that folder into a proper installer.
+
+You only need to do this on your Windows machine — none of this can run
+in the sandbox since PyInstaller produces a native Windows binary.
+
+
+STAGE 1 — Build the .exe with PyInstaller
+-------------------------------------------
+
+1. Open a Command Prompt or PowerShell window.
+
+2. Install PyInstaller if you don't have it yet:
+
+       pip install pyinstaller --break-system-packages
+
+   (drop --break-system-packages if you're not on a Python that needs it —
+    on a normal Windows Python install you can just run: pip install pyinstaller)
+
+3. Navigate to the folder containing both:
+     - pikapika.py
+     - pikapika.ico
+
+       cd C:\path\to\your\folder
+
+4. Run PyInstaller:
+
+       pyinstaller --noconfirm --onedir --windowed --name "Pikapika" --icon "pikapika.ico" --add-data "pikapika.ico;." pikapika.py
+
+   What each flag does:
+     --onedir       creates a folder with the .exe + dependencies
+                    (this starts faster than --onefile, recommended)
+     --windowed     suppresses the black console window (since this is a GUI app)
+     --name         sets the output exe name to Pikapika.exe
+     --icon         embeds your kitty icon as the .exe file's icon in Explorer
+     --add-data     bundles the .ico file INSIDE the app so the running window
+                    can also show it (the --icon flag alone only sets the file
+                    icon, not the titlebar/taskbar icon while the app is open)
+
+   IMPORTANT: if you ran PyInstaller before without --add-data, you must
+   delete the old "build" and "dist" folders first, then re-run the
+   command above — PyInstaller caches aggressively and may reuse a stale
+   build otherwise:
+
+       rmdir /s /q build
+       rmdir /s /q dist
+
+   Then re-run the pyinstaller command.
+
+5. After it finishes, you'll have:
+
+       dist\Pikapika\Pikapika.exe
+       dist\Pikapika\  (plus a bunch of supporting files — leave them all there)
+
+6. Test it: double-click dist\Pikapika\Pikapika.exe and confirm the app
+   opens normally with all four tabs working.
+
+
+STAGE 2 — Wrap it with Inno Setup
+------------------------------------
+
+1. Download and install Inno Setup (free) from:
+       https://jrsoftware.org/isinfo.php
+
+2. Put these three items in the SAME folder:
+     - pikapika.iss          (the installer script, provided)
+     - pikapika.ico          (the icon, provided)
+     - the "dist" folder     (created by PyInstaller in Stage 1)
+
+   Your folder should look like:
+
+       MyBuildFolder\
+           pikapika.iss
+           pikapika.ico
+           dist\
+               Pikapika\
+                   Pikapika.exe
+                   (other PyInstaller files...)
+
+3. Right-click pikapika.iss -> "Compile"
+   (or open it in the Inno Setup IDE and press Ctrl+F9 / click Compile)
+
+4. Inno Setup will create:
+
+       installer_output\Pikapika_Setup_v1.0.exe
+
+   This is the file you share/run to install Pikapika on any Windows PC.
+   It creates a Start Menu entry, an optional Desktop shortcut, and a
+   proper uninstaller — all under Add/Remove Programs.
+
+
+NOTES
+-----
+- If Windows SmartScreen flags the installer as "unrecognized" (common for
+  unsigned indie apps), that's expected — code signing requires a paid
+  certificate. Clicking "More info" -> "Run anyway" bypasses it safely.
+
+- If you ever update pikapika.py, just repeat Stage 1 to
+  regenerate the dist folder, then re-run Stage 2 — the .iss script
+  doesn't need any changes between builds.
+
+- To bump the version number later, just change MyAppVersion at the top
+  of pikapika.iss (e.g. "1.0" -> "1.1") before recompiling.
+
+
+TROUBLESHOOTING — "white blank page" icon on shortcuts / taskbar
+-------------------------------------------------------------------
+This happens when Windows can't find the actual .ico file the shortcut
+is pointing to, so it falls back to a generic "untitled document" icon.
+Two separate causes, fix both if needed:
+
+A) The installer wasn't copying pikapika.ico into the install folder.
+   This has been fixed in the updated pikapika.iss (it now has an extra
+   line in [Files] that copies pikapika.ico alongside the .exe). Just
+   recompile the installer with the updated .iss and reinstall.
+
+B) Windows icon cache is stale (very common, especially after rebuilding
+   an app multiple times with different icons). Even after the real fix
+   above, old cached icons can stick around. To force Windows to refresh:
+
+     1. Unpin / delete any existing Pikapika shortcuts (taskbar, desktop,
+        Start Menu) — right-click -> Unpin from taskbar / Delete
+     2. Uninstall Pikapika via Settings -> Apps (or the uninstaller)
+     3. Open Command Prompt and run:
+            ie4uinit.exe -show
+        (this forces an icon cache rebuild; you can also just restart
+         Windows Explorer via Task Manager, or simply reboot)
+     4. Reinstall Pikapika using the freshly recompiled installer
+     5. Re-pin to taskbar if desired
+
+   If the icon STILL looks wrong after this, delete the icon cache file
+   directly (close Explorer first via Task Manager -> right-click
+   Windows Explorer -> Restart, or run from an elevated prompt):
+            del /a /q "%localappdata%\IconCache.db"
+   then reboot.
